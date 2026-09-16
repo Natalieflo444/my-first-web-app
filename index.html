@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Counter App</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Canvas Confetti Library for goal celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    animation: {
+                        'bounce-short': 'bounce 0.3s ease-in-out 1',
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)' },
+                            '50%': { boxShadow: '0 0 30px rgba(99, 102, 241, 0.8)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom scrollbar styling for history logs */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.7);
+        }
+        
+        .counter-number {
+            font-variant-numeric: tabular-nums;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease;
+        }
+        .scale-pop {
+            transform: scale(1.08);
+        }
+    </style>
+</head>
+
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Header Navigation -->
+    <header class="w-full max-w-4xl mx-auto px-4 py-4 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-arrow-up-9-1 text-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
+                    PulseCount
+                </h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Smart Interactive Counter</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Sound Toggle Button -->
+            <button id="soundBtn" onclick="toggleSound()" class="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm" title="Toggle Sound">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-sm"></i>
+            </button>
+
+            <!-- Dark Mode Toggle Button -->
+            <button id="themeBtn" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm" title="Toggle Theme">
+                <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
+            </button>
+
+            <!-- Settings Modal Toggle -->
+            <button onclick="toggleModal('settingsModal')" class="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm" title="Counter Settings">
+                <i class="fa-solid fa-gear text-sm"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="w-full max-w-4xl mx-auto px-4 py-6 flex-1 flex flex-col justify-center items-center gap-6">
+
+        <!-- Target Progress Card (If enabled) -->
+        <div id="goalCard" class="w-full max-w-md bg-white dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm transition">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-bullseye text-indigo-500"></i> Target Goal
+                </span>
+                <span id="goalText" class="text-xs font-bold font-mono text-indigo-600 dark:text-indigo-400">0 / 100</span>
+            </div>
+            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div id="goalProgressBar" class="bg-gradient-to-r from-indigo-500 to-violet-500 h-full w-0 transition-all duration-300 rounded-full"></div>
+            </div>
+        </div>
+
+        <!-- MAIN COUNTER DISPLAY BOARD -->
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col items-center justify-center relative overflow-hidden group">
+            
+            <!-- Accent Ambient Background Glow -->
+            <div class="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-violet-500/10 dark:bg-violet-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Counter Label / Title -->
+            <div class="flex items-center gap-2 mb-2">
+                <input type="text" id="counterTitle" value="Main Counter" class="text-center font-semibold text-slate-400 dark:text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:outline-none text-sm transition px-2 py-0.5 rounded" title="Click to rename counter">
+            </div>
+
+            <!-- Digital Number Display -->
+            <div class="my-6 relative flex items-center justify-center min-h-[120px] w-full">
+                <span id="counterValue" class="counter-number text-7xl md:text-8xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white select-none">
+                    0
+                </span>
+            </div>
+
+            <!-- Main Button Controls -->
+            <div class="grid grid-cols-3 gap-3 w-full mt-2">
+                <!-- Decrement Button -->
+                <button onclick="decrement()" class="py-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-700 dark:text-slate-200 hover:text-red-600 dark:hover:text-red-400 border border-slate-200/60 dark:border-slate-700/60 active:scale-95 transition flex flex-col items-center justify-center gap-1 group/btn shadow-sm">
+                    <i class="fa-solid fa-minus text-xl group-hover/btn:scale-110 transition-transform"></i>
+                    <span class="text-[10px] font-bold tracking-wider uppercase opacity-60">Decrease</span>
+                </button>
+
+                <!-- Reset Button -->
+                <button onclick="resetCounter()" class="py-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200/60 dark:border-slate-700/60 active:scale-95 transition flex flex-col items-center justify-center gap-1 group/btn shadow-sm">
+                    <i class="fa-solid fa-rotate-left text-lg group-hover/btn:-rotate-90 transition-transform"></i>
+                    <span class="text-[10px] font-bold tracking-wider uppercase opacity-60">Reset</span>
+                </button>
+
+                <!-- Increment Button -->
+                <button onclick="increment()" class="py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 active:scale-95 transition flex flex-col items-center justify-center gap-1 group/btn">
+                    <i class="fa-solid fa-plus text-xl group-hover/btn:scale-125 transition-transform"></i>
+                    <span class="text-[10px] font-bold tracking-wider uppercase opacity-80">Increase</span>
+                </button>
+            </div>
+
+            <!-- Step Size Selector Bar -->
+            <div class="mt-6 w-full pt-4 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-2">
+                <span class="text-xs font-medium text-slate-400 dark:text-slate-500">Step Size:</span>
+                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                    <button onclick="setStep(1)" class="step-btn px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 dark:text-slate-300 hover:text-slate-900" data-step="1">1</button>
+                    <button onclick="setStep(5)" class="step-btn px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 dark:text-slate-300 hover:text-slate-900" data-step="5">5</button>
+                    <button onclick="setStep(10)" class="step-btn px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 dark:text-slate-300 hover:text-slate-900" data-step="10">10</button>
+                    <button onclick="setStep(100)" class="step-btn px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 dark:text-slate-300 hover:text-slate-900" data-step="100">100</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- History & Statistics Section -->
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-indigo-500"></i> Action Log
+                </h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="undoLastAction()" class="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline flex items-center gap-1">
+                        <i class="fa-solid fa-reply text-[10px]"></i> Undo
+                    </button>
+                    <span class="text-slate-300 dark:text-slate-700">•</span>
+                    <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-red-500 font-medium transition">
+                        Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- History List Container -->
+            <div id="historyList" class="max-h-36 overflow-y-auto space-y-2 pr-1 text-xs font-mono">
+                <!-- Log entries dynamically populated -->
+                <p id="emptyHistoryMsg" class="text-slate-400 dark:text-slate-600 text-center py-4 text-xs font-sans">No recent activity</p>
+            </div>
+        </div>
+
+        <!-- Keyboard Shortcuts Hint -->
+        <div class="text-center text-xs text-slate-400 dark:text-slate-500 flex flex-wrap justify-center gap-3">
+            <span><kbd class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[10px] text-slate-600 dark:text-slate-300">Space</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[10px] text-slate-600 dark:text-slate-300">▲</kbd> +1</span>
+            <span><kbd class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[10px] text-slate-600 dark:text-slate-300">▼</kbd> -1</span>
+            <span><kbd class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[10px] text-slate-600 dark:text-slate-300">R</kbd> Reset</span>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200 px-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform duration-200">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-indigo-500"></i> Counter Settings
+                </h3>
+                <button onclick="toggleModal('settingsModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-sm">
+                <!-- Direct Value Set -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Set Counter Value</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="directValueInput" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-sm focus:outline-none focus:border-indigo-500">
+                        <button onclick="applyDirectValue()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium text-xs">Set</button>
+                    </div>
+                </div>
+
+                <!-- Custom Target Goal -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Target Goal (0 to disable)</label>
+                    <input type="number" id="targetGoalInput" value="100" min="0" onchange="updateGoalSetting()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <!-- Limits Toggle -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Min Value</label>
+                        <input type="number" id="minValueInput" placeholder="None" onchange="updateMinMax()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Max Value</label>
+                        <input type="number" id="maxValueInput" placeholder="None" onchange="updateMinMax()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <button onclick="toggleModal('settingsModal')" class="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs transition">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2 rounded-full text-xs font-semibold shadow-lg transition-all duration-300 opacity-0 translate-y-4 pointer-events-none z-50 flex items-center gap-2">
+        <i id="toastIcon" class="fa-solid fa-circle-info"></i>
+        <span id="toastMsg">Notification</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-4xl mx-auto px-4 py-4 text-center text-xs text-slate-400 dark:text-slate-600">
+        PulseCount &bull; Modern Single-File Web App
+    </footer>
+
+    <script>
+        // Application State
+        let state = {
+            count: 0,
+            step: 1,
+            goal: 100,
+            min: null,
+            max: null,
+            soundEnabled: true,
+            isDark: false,
+            history: []
+        };
+
+        // Web Audio API Synthesizer Sound Generator
+        let audioCtx = null;
+
+        function playSound(type) {
+            if (!state.soundEnabled) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'increment') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'decrement') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(260, now + 0.08);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'reset') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.linearRampToValueAtTime(150, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'goal') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                }
+            } catch (e) {
+                console.warn('Audio playback error', e);
+            }
+        }
+
+        // Initialize State on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSavedState();
+            updateUI();
+            setupKeyboardShortcuts();
+        });
+
+        function increment() {
+            if (state.max !== null && state.count + state.step > state.max) {
+                showToast(`Maximum limit of ${state.max} reached!`, 'fa-triangle-exclamation');
+                return;
+            }
+
+            const prev = state.count;
+            state.count += state.step;
+            addHistoryLog('Increment', `+${state.step}`, prev, state.count);
+            
+            playSound('increment');
+            animateNumber('up');
+            checkGoal(prev);
+            saveState();
+            updateUI();
+        }
+
+        function decrement() {
+            if (state.min !== null && state.count - state.step < state.min) {
+                showToast(`Minimum limit of ${state.min} reached!`, 'fa-triangle-exclamation');
+                return;
+            }
+
+            const prev = state.count;
+            state.count -= state.step;
+            addHistoryLog('Decrement', `-${state.step}`, prev, state.count);
+            
+            playSound('decrement');
+            animateNumber('down');
+            saveState();
+            updateUI();
+        }
+
+        function resetCounter() {
+            if (state.count === 0) return;
+            const prev = state.count;
+            state.count = 0;
+            addHistoryLog('Reset', 'Set to 0', prev, 0);
+            
+            playSound('reset');
+            animateNumber('reset');
+            showToast('Counter reset to 0', 'fa-rotate-left');
+            saveState();
+            updateUI();
+        }
+
+        function setStep(newStep) {
+            state.step = Number(newStep);
+            saveState();
+            updateUI();
+        }
+
+        function applyDirectValue() {
+            const input = document.getElementById('directValueInput');
+            const val = parseInt(input.value, 10);
+            if (!isNaN(val)) {
+                const prev = state.count;
+                state.count = val;
+                addHistoryLog('Set Value', `Set to ${val}`, prev, val);
+                saveState();
+                updateUI();
+                toggleModal('settingsModal');
+                showToast(`Value set to ${val}`, 'fa-pen');
+            }
+        }
+
+        function updateGoalSetting() {
+            const val = parseInt(document.getElementById('targetGoalInput').value, 10);
+            state.goal = isNaN(val) || val < 0 ? 0 : val;
+            saveState();
+            updateUI();
+        }
+
+        function updateMinMax() {
+            const minVal = document.getElementById('minValueInput').value;
+            const maxVal = document.getElementById('maxValueInput').value;
+            state.min = minVal !== "" ? Number(minVal) : null;
+            state.max = maxVal !== "" ? Number(maxVal) : null;
+            saveState();
+        }
+
+        function checkGoal(previousCount) {
+            if (state.goal > 0 && previousCount < state.goal && state.count >= state.goal) {
+                playSound('goal');
+                showToast(`🎉 Goal of ${state.goal} achieved!`, 'fa-trophy');
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: 80,
+                        spread: 60,
+                        origin: { y: 0.6 }
+                    });
+                }
+            }
+        }
+
+        function addHistoryLog(action, delta, fromVal, toVal) {
+            const logEntry = {
+                id: Date.now(),
+                action,
+                delta,
+                fromVal,
+                toVal,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            };
+            state.history.unshift(logEntry);
+            if (state.history.length > 25) state.history.pop();
+        }
+
+        function undoLastAction() {
+            if (state.history.length === 0) {
+                showToast('No actions to undo', 'fa-info-circle');
+                return;
+            }
+            const last = state.history.shift();
+            state.count = last.fromVal;
+            saveState();
+            updateUI();
+            showToast(`Undid ${last.action}`, 'fa-reply');
+        }
+
+        function clearHistory() {
+            state.history = [];
+            saveState();
+            updateUI();
+            showToast('History cleared', 'fa-trash-can');
+        }
+
+        // Visual Animations
+        function animateNumber(direction) {
+            const numEl = document.getElementById('counterValue');
+            numEl.classList.add('scale-pop');
+            
+            if (direction === 'up') {
+                numEl.classList.add('text-indigo-600', 'dark:text-indigo-400');
+            } else if (direction === 'down') {
+                numEl.classList.add('text-red-500', 'dark:text-red-400');
+            }
+
+            setTimeout(() => {
+                numEl.classList.remove('scale-pop', 'text-indigo-600', 'dark:text-indigo-400', 'text-red-500', 'dark:text-red-400');
+            }, 150);
+        }
+
+        function updateUI() {
+            // Update counter number display
+            document.getElementById('counterValue').innerText = state.count;
+            document.getElementById('directValueInput').value = state.count;
+
+            // Step buttons styling
+            document.querySelectorAll('.step-btn').forEach(btn => {
+                const btnStep = Number(btn.getAttribute('data-step'));
+                if (btnStep === state.step) {
+                    btn.className = 'step-btn px-2.5 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow-sm';
+                } else {
+                    btn.className = 'step-btn px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700';
+                }
+            });
+
+            // Target goal card update
+            const goalCard = document.getElementById('goalCard');
+            if (state.goal > 0) {
+                goalCard.classList.remove('hidden');
+                document.getElementById('goalText').innerText = `${state.count} / ${state.goal}`;
+                const pct = Math.min(100, Math.max(0, (state.count / state.goal) * 100));
+                document.getElementById('goalProgressBar').style.width = `${pct}%`;
+            } else {
+                goalCard.classList.add('hidden');
+            }
+
+            // Render History List
+            const historyList = document.getElementById('historyList');
+            const emptyMsg = document.getElementById('emptyHistoryMsg');
+
+            if (state.history.length === 0) {
+                historyList.innerHTML = '';
+                historyList.appendChild(emptyMsg);
+            } else {
+                historyList.innerHTML = state.history.map(item => `
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold ${item.delta.startsWith('+') ? 'text-indigo-600 dark:text-indigo-400' : item.delta.startsWith('-') ? 'text-red-500' : 'text-slate-500'}">
+                                ${item.delta}
+                            </span>
+                            <span class="text-slate-500 dark:text-slate-400 font-sans text-[11px]">${item.action}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-slate-400 text-[10px]">
+                            <span>${item.fromVal} &rarr; <strong class="text-slate-700 dark:text-slate-200">${item.toVal}</strong></span>
+                            <span>${item.time}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Sound Icon Toggle
+            const soundIcon = document.getElementById('soundIcon');
+            soundIcon.className = state.soundEnabled ? 'fa-solid fa-volume-high text-sm' : 'fa-solid fa-volume-xmark text-sm opacity-50';
+
+            // Theme Icon Toggle
+            const themeIcon = document.getElementById('themeIcon');
+            if (state.isDark) {
+                document.documentElement.classList.add('dark');
+                themeIcon.className = 'fa-solid fa-sun text-sm text-amber-400';
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIcon.className = 'fa-solid fa-moon text-sm';
+            }
+        }
+
+        // Toggle Sound State
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            saveState();
+            updateUI();
+            showToast(state.soundEnabled ? 'Sound Enabled' : 'Sound Muted', state.soundEnabled ? 'fa-volume-high' : 'fa-volume-xmark');
+        }
+
+        // Toggle Theme State
+        function toggleTheme() {
+            state.isDark = !state.isDark;
+            saveState();
+            updateUI();
+        }
+
+        // Modal Helper
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.children[0].classList.remove('scale-95');
+                }, 10);
+            } else {
+                modal.classList.add('opacity-0');
+                modal.children[0].classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 200);
+            }
+        }
+
+        // Toast Helper Notification
+        let toastTimeout = null;
+        function showToast(msg, icon = 'fa-info-circle') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = msg;
+            toastIcon.className = `fa-solid ${icon}`;
+
+            toast.classList.remove('opacity-0', 'translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-4');
+            }, 2000);
+        }
+
+        // Keyboard Navigation Shortcuts
+        function setupKeyboardShortcuts() {
+            window.addEventListener('keydown', (e) => {
+                // Ignore keypresses if typing inside input fields
+                if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+                if (e.key === ' ' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    increment();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    decrement();
+                } else if (e.key.toLowerCase() === 'r') {
+                    e.preventDefault();
+                    resetCounter();
+                } else if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    undoLastAction();
+                }
+            });
+        }
+
+        // State Persistence via LocalStorage
+        function saveState() {
+            try {
+                localStorage.setItem('pulse_counter_state', JSON.stringify(state));
+            } catch (e) {
+                console.warn('Unable to save state to localStorage', e);
+            }
+        }
+
+        function loadSavedState() {
+            try {
+                const saved = localStorage.getItem('pulse_counter_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                }
+            } catch (e) {
+                console.warn('Unable to read saved state', e);
+            }
+        }
+    </script>
+</body>
+</html>
